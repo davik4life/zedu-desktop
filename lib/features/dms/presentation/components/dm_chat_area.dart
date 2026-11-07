@@ -979,6 +979,27 @@ class _MessageBubble extends ConsumerWidget {
     required this.onEdit,
   });
 
+  /// Asks when to be reminded about this message, then saves the reminder.
+  void _remind(
+    BuildContext context,
+    WidgetRef ref,
+    String messageId,
+    String senderName,
+    String text,
+  ) {
+    remindAboutMessage(
+      context,
+      ref,
+      source: ReminderSource.dm,
+      channelId: channelId,
+      channelName: conversation.displayName,
+      participantId: conversation.participantId,
+      senderName: senderName,
+      messageText: text,
+      messageId: messageId,
+    );
+  }
+
   TextSpan _parseRichText(
     String text,
     TextStyle defaultStyle,
@@ -1243,6 +1264,8 @@ class _MessageBubble extends ConsumerWidget {
                     isSaved: isSaved,
                     onPin: () => _pin(context, ref, messageId),
                     onToggleSave: toggleSaved,
+                    onRemind: () =>
+                        _remind(context, ref, messageId, senderName, content),
                     onEdit: isMe && status == null
                         ? () => onEdit(messageId, content)
                         : null,
@@ -1282,6 +1305,13 @@ class _MessageBubble extends ConsumerWidget {
                             isSaved: isSaved,
                             onPin: () => _pin(context, ref, messageId),
                             onToggleSave: toggleSaved,
+                            onRemind: () => _remind(
+                              context,
+                              ref,
+                              messageId,
+                              senderName,
+                              'Sent an attachment',
+                            ),
                             onEdit: null,
                             onDelete: isMe && status == null
                                 ? () => _confirmDelete(context, ref, messageId)
@@ -1503,7 +1533,8 @@ class MessageAttachmentList extends StatelessWidget {
 }
 
 /// Shows a "more" button on hover, and a right-click or long-press menu, for
-/// a message: Pin and Save on every message, and Edit and Delete on your own.
+/// a message: Pin, Save and Remind me on every message, and Edit and Delete on
+/// your own.
 /// The long press is for touch input, where there is no hover or right click.
 ///
 /// Your own messages keep a fixed gutter for the button so the bubble never
@@ -1516,6 +1547,7 @@ class _MessageMenu extends StatefulWidget {
     required this.isSaved,
     required this.onPin,
     required this.onToggleSave,
+    required this.onRemind,
     required this.onEdit,
     required this.onDelete,
     required this.child,
@@ -1526,6 +1558,7 @@ class _MessageMenu extends StatefulWidget {
   final bool isSaved;
   final VoidCallback onPin;
   final VoidCallback onToggleSave;
+  final VoidCallback onRemind;
 
   /// Null on other people's messages, which can't be edited or deleted.
   final VoidCallback? onEdit;
@@ -1550,22 +1583,54 @@ class _MessageMenuState extends State<_MessageMenu> {
       icon: const Icon(Icons.more_horiz, size: 18),
       onSelected: (value) => switch (value) {
         'pin' => widget.onPin(),
+        'remind' => widget.onRemind(),
         'edit' => widget.onEdit?.call(),
         'save' => widget.onToggleSave(),
         _ => widget.onDelete?.call(),
       },
-      itemBuilder: (_) => [
-        const PopupMenuItem(value: 'pin', child: Text('Pin message')),
+      itemBuilder: (context) => [
+        const PopupMenuItem(
+          value: 'pin',
+          child: MenuItemRow(
+            icon: Icons.push_pin_outlined,
+            label: 'Pin message',
+          ),
+        ),
+        const PopupMenuItem(
+          value: 'remind',
+          child: MenuItemRow(
+            icon: Icons.alarm_add_outlined,
+            label: 'Remind me',
+          ),
+        ),
         if (widget.onEdit != null)
-          const PopupMenuItem(value: 'edit', child: Text('Edit message')),
+          const PopupMenuItem(
+            value: 'edit',
+            child: MenuItemRow(
+              icon: Icons.edit_outlined,
+              label: 'Edit message',
+            ),
+          ),
         PopupMenuItem(
           value: 'save',
-          child: Text(
-            widget.isSaved ? 'Remove from Saved items' : 'Save to Saved items',
+          child: MenuItemRow(
+            icon: widget.isSaved
+                ? Icons.bookmark_remove_outlined
+                : Icons.bookmark_add_outlined,
+            label: widget.isSaved
+                ? 'Remove from Saved items'
+                : 'Save to Saved items',
           ),
         ),
         if (widget.onDelete != null)
-          const PopupMenuItem(value: 'delete', child: Text('Delete message')),
+          PopupMenuItem(
+            value: 'delete',
+            child: MenuItemRow(
+              icon: Icons.delete_outline,
+              label: 'Delete message',
+              color: context.colors.error,
+            ),
+          ),
       ],
     );
 

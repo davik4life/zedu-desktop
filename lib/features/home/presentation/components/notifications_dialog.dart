@@ -3,10 +3,10 @@ import 'package:zedu/features/features.dart';
 
 /// Panel opened from the notifications bell in the sidebar rail.
 ///
-/// Lists the DMs that have unread messages and opens one when clicked. There
-/// is no mentions feed yet, so the empty state shows whenever no DM is
-/// unread. Real incoming-message notifications are still delivered by
-/// `NotificationService`.
+/// Lists the user's reminders ("Remind me" on a message), then the DMs that
+/// have unread messages, and opens one when clicked. There is no mentions feed
+/// yet, so the empty state shows whenever there is nothing to show. Real
+/// incoming-message notifications are still delivered by `NotificationService`.
 class NotificationsDialog extends ConsumerWidget {
   const NotificationsDialog({super.key});
 
@@ -33,6 +33,7 @@ class NotificationsDialog extends ConsumerWidget {
     final deletedIds = ref.watch(
       dmConversationActionsProvider.select((a) => a.deletedIds),
     );
+    final hasReminders = ref.watch(remindersProvider).isNotEmpty;
     final unread = (dmState.value ?? const <DmConversation>[])
         .where((c) => c.unreadCount > 0 && !deletedIds.contains(c.channelId))
         .toList();
@@ -79,29 +80,30 @@ class NotificationsDialog extends ConsumerWidget {
               ),
             ),
             Divider(height: 1, color: colors.divider),
-            if (unread.isEmpty && dmState.isLoading)
-              const Padding(
-                padding: EdgeInsets.symmetric(vertical: 40),
-                child: CircularProgressIndicator(),
-              )
-            else if (unread.isEmpty)
-              const _EmptyState()
-            else
-              ConstrainedBox(
-                constraints: const BoxConstraints(maxHeight: 360),
-                child: ListView(
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.symmetric(vertical: 6),
-                  children: [
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 420),
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                children: [
+                  const RemindersSection(),
+                  if (unread.isEmpty && dmState.isLoading)
+                    const Padding(
+                      padding: EdgeInsets.symmetric(vertical: 40),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  else if (unread.isEmpty && !hasReminders)
+                    const _EmptyState()
+                  else
                     for (final conversation in unread)
                       _UnreadDmRow(
                         conversation: conversation,
                         onTap: () =>
                             _openConversation(context, ref, conversation),
                       ),
-                  ],
-                ),
+                ],
               ),
+            ),
           ],
         ),
       ),

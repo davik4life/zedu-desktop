@@ -65,6 +65,25 @@ class ChannelMessageList extends ConsumerWidget {
         );
   }
 
+  /// Asks when to be reminded about [message], then saves the reminder.
+  void _remind(BuildContext context, WidgetRef ref, ChannelMessage message) {
+    final channels = ref.read(channelProvider).value ?? const <Channel>[];
+    var name = ref.read(activeChatProvider).id ?? '';
+    for (final channel in channels) {
+      if (channel.id == channelId) name = channel.name;
+    }
+    remindAboutMessage(
+      context,
+      ref,
+      source: ReminderSource.channel,
+      channelId: channelId,
+      channelName: name.isEmpty ? 'channel' : name,
+      senderName: message.senderName,
+      messageText: message.text,
+      messageId: message.threadId ?? message.id,
+    );
+  }
+
   Widget _buildList(
     BuildContext context,
     WidgetRef ref,
@@ -119,6 +138,10 @@ class ChannelMessageList extends ConsumerWidget {
               : null,
           onDelete: own
               ? () => _deleteChannelMessage(context, ref, channelId, message)
+              : null,
+          // Any message that was sent can be reminded about, not only your own.
+          onRemind: message.status == null
+              ? () => _remind(context, ref, message)
               : null,
         );
         // Newest first, so the next index is the older neighbour. A day
@@ -281,6 +304,7 @@ class ChannelMessageTile extends ConsumerStatefulWidget {
     this.onEdit,
     this.onDelete,
     this.saveAction,
+    this.onRemind,
   });
 
   final String channelId;
@@ -293,6 +317,9 @@ class ChannelMessageTile extends ConsumerStatefulWidget {
   /// Set for the current user's own messages; shows Delete in the menu.
   final VoidCallback? onDelete;
   final Widget? saveAction;
+
+  /// Set for every sent message; shows "Remind me" in the menu.
+  final VoidCallback? onRemind;
 
   @override
   ConsumerState<ChannelMessageTile> createState() => _ChannelMessageTileState();
@@ -413,10 +440,13 @@ class _ChannelMessageTileState extends ConsumerState<ChannelMessageTile> {
                       ),
                     ),
                     ?widget.saveAction,
-                    if (widget.onEdit != null || widget.onDelete != null)
-                      _OwnMessageMenu(
+                    if (widget.onEdit != null ||
+                        widget.onDelete != null ||
+                        widget.onRemind != null)
+                      _MessageMenu(
                         onEdit: widget.onEdit,
                         onDelete: widget.onDelete,
+                        onRemind: widget.onRemind,
                       ),
                   ],
                 ),
@@ -666,12 +696,13 @@ Future<void> _deleteChannelMessage(
   }
 }
 
-/// Edit and Delete for the current user's own channel message.
-class _OwnMessageMenu extends StatelessWidget {
-  const _OwnMessageMenu({this.onEdit, this.onDelete});
+/// Remind me for any message; Edit and Delete for the user's own.
+class _MessageMenu extends StatelessWidget {
+  const _MessageMenu({this.onEdit, this.onDelete, this.onRemind});
 
   final VoidCallback? onEdit;
   final VoidCallback? onDelete;
+  final VoidCallback? onRemind;
 
   @override
   Widget build(BuildContext context) {
@@ -686,18 +717,34 @@ class _OwnMessageMenu extends StatelessWidget {
         iconSize: 18,
         icon: Icon(Icons.more_horiz, color: colors.textSecondary),
         onSelected: (value) {
+          if (value == 'remind') onRemind?.call();
           if (value == 'edit') onEdit?.call();
           if (value == 'delete') onDelete?.call();
         },
         itemBuilder: (_) => [
+          if (onRemind != null)
+            const PopupMenuItem(
+              value: 'remind',
+              child: MenuItemRow(
+                icon: Icons.alarm_add_outlined,
+                label: 'Remind me',
+              ),
+            ),
           if (onEdit != null)
-            const PopupMenuItem(value: 'edit', child: Text('Edit message')),
+            const PopupMenuItem(
+              value: 'edit',
+              child: MenuItemRow(
+                icon: Icons.edit_outlined,
+                label: 'Edit message',
+              ),
+            ),
           if (onDelete != null)
             PopupMenuItem(
               value: 'delete',
-              child: Text(
-                'Delete message',
-                style: TextStyle(color: colors.error),
+              child: MenuItemRow(
+                icon: Icons.delete_outline,
+                label: 'Delete message',
+                color: colors.error,
               ),
             ),
         ],

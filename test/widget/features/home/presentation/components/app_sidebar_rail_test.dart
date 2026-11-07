@@ -32,7 +32,10 @@ void main() {
 
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [dmListProvider.overrideWith(_EmptyDmList.new)],
+        overrides: [
+          dmListProvider.overrideWith(_EmptyDmList.new),
+          dueReminderCountProvider.overrideWithValue(0),
+        ],
         child: MaterialApp(
           theme: AppTheme.light,
           home: const Scaffold(
@@ -91,7 +94,10 @@ void main() {
   ) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [dmListProvider.overrideWith(_EmptyDmList.new)],
+        overrides: [
+          dmListProvider.overrideWith(_EmptyDmList.new),
+          dueReminderCountProvider.overrideWithValue(0),
+        ],
         child: MaterialApp(
           theme: AppTheme.light,
           home: const Scaffold(
@@ -121,7 +127,10 @@ void main() {
   ) async {
     await tester.pumpWidget(
       ProviderScope(
-        overrides: [dmListProvider.overrideWith(_DmListWithUnread.new)],
+        overrides: [
+          dmListProvider.overrideWith(_DmListWithUnread.new),
+          dueReminderCountProvider.overrideWithValue(0),
+        ],
         child: MaterialApp(
           theme: AppTheme.light,
           home: const Scaffold(

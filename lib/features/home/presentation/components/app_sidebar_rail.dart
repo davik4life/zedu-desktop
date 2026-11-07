@@ -72,6 +72,7 @@ class _AppSidebarRailState extends ConsumerState<AppSidebarRail> {
           conversation.unreadCount > 0 &&
           !deletedConversationIds.contains(conversation.channelId),
     );
+    final dueReminders = ref.watch(dueReminderCountProvider);
     return Container(
       width: AppSidebarRail.width,
       decoration: BoxDecoration(
@@ -141,7 +142,7 @@ class _AppSidebarRailState extends ConsumerState<AppSidebarRail> {
           ),
           _RailBottomIcon(
             icon: Icons.notifications_none_outlined,
-            hasNotification: hasUnreadDms,
+            hasNotification: hasUnreadDms || dueReminders > 0,
             tooltip: 'Notifications',
             onTap: () {
               showDialog<void>(

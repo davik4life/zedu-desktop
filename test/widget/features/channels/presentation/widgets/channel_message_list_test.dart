@@ -62,6 +62,12 @@ Success<ChannelMessagePage> _page(
   bool hasMore = false,
 }) => Success(ChannelMessagePage(messages: messages, hasMore: hasMore));
 
+/// No workspace, so the list does not need the app config to load one.
+class _NoWorkspace extends WorkspaceNotifier {
+  @override
+  WorkspaceState build() => const WorkspaceState();
+}
+
 void main() {
   late MockChannelRepository repository;
   late FakeChatHistoryNotifier fakeChatHistory;
@@ -96,6 +102,8 @@ void main() {
         overrides: [
           channelRepositoryProvider.overrideWithValue(repository),
           authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
+          // The Save for later button on each message reads the workspace.
+          workspaceProvider.overrideWith(_NoWorkspace.new),
           chatHistoryProvider.overrideWith(
             (ref, channelId) => chatNotifier ?? fakeChatHistory,
           ),
@@ -493,20 +501,40 @@ void main() {
       ).thenAnswer((_) async => const Success(null));
     });
 
-    testWidgets('only your own messages get the actions menu', (tester) async {
+    testWidgets('every sent message gets a menu, with Remind me', (
+      tester,
+    ) async {
       await pumpList(tester, const Success([mine, theirs]));
 
-      expect(actions, findsOneWidget);
-      expect(
-        find.descendant(
-          of: find.ancestor(
-            of: find.text('my typo'),
-            matching: find.byType(ChannelMessageTile),
-          ),
-          matching: actions,
+      expect(actions, findsNWidgets(2));
+    });
+
+    testWidgets('Edit and Delete are only offered on your own messages', (
+      tester,
+    ) async {
+      await pumpList(tester, const Success([mine, theirs]));
+
+      Finder menuOf(String text) => find.descendant(
+        of: find.ancestor(
+          of: find.text(text),
+          matching: find.byType(ChannelMessageTile),
         ),
-        findsOneWidget,
+        matching: actions,
       );
+
+      await tester.tap(menuOf('not yours'));
+      await tester.pumpAndSettle();
+      expect(find.text('Remind me'), findsOneWidget);
+      expect(find.text('Edit message'), findsNothing);
+      expect(find.text('Delete message'), findsNothing);
+      await tester.tapAt(const Offset(1, 1));
+      await tester.pumpAndSettle();
+
+      await tester.tap(menuOf('my typo'));
+      await tester.pumpAndSettle();
+      expect(find.text('Remind me'), findsOneWidget);
+      expect(find.text('Edit message'), findsOneWidget);
+      expect(find.text('Delete message'), findsOneWidget);
     });
 
     testWidgets('Edit saves the new text and reloads the channel', (

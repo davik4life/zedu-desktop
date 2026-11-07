@@ -32,7 +32,10 @@ Future<_FakeProfileNotifier> _pumpPeopleCard(
   final notifier = _FakeProfileNotifier(state);
   await tester.pumpWidget(
     ProviderScope(
-      overrides: [userProfileNotifierProvider.overrideWith(() => notifier)],
+      overrides: [
+        userProfileNotifierProvider.overrideWith(() => notifier),
+        dueReminderCountProvider.overrideWithValue(0),
+      ],
       child: buildTestMaterialApp(
         Scaffold(
           body: SidebarPopoutCard(
@@ -94,6 +97,7 @@ Future<int> _hoverPeopleAndCountLoads(
         userProfileNotifierProvider.overrideWith(() => notifier),
         authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
         dmListProvider.overrideWith(_EmptyDmListNotifier.new),
+        dueReminderCountProvider.overrideWithValue(0),
       ],
       child: buildTestMaterialApp(
         const Scaffold(

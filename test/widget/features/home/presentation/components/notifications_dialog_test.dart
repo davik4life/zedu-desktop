@@ -2,6 +2,34 @@ import 'package:zedu/core/core.dart';
 import 'package:zedu/features/features.dart';
 import '../../../../../helpers/helpers.dart';
 
+/// No reminders, so these tests do not need the storage and workspace the
+/// real list reads.
+class _NoReminders extends RemindersNotifier {
+  @override
+  List<MessageReminder> build() => const [];
+}
+
+class _WithReminders extends RemindersNotifier {
+  _WithReminders(this.reminders);
+
+  final List<MessageReminder> reminders;
+
+  @override
+  List<MessageReminder> build() => reminders;
+}
+
+final _reminder = MessageReminder(
+  id: 'r1',
+  source: ReminderSource.channel,
+  channelId: 'c-general',
+  channelName: 'general',
+  senderName: 'Amara',
+  preview: 'Send the course outline',
+  dueAt: DateTime(2020),
+  createdAt: DateTime(2019),
+  firedAt: DateTime(2020),
+);
+
 class _Dms extends DmListNotifier {
   _Dms(this.conversations);
 
@@ -37,7 +65,10 @@ void main() {
     }) async {
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [dmListProvider.overrideWith(() => _Dms(dms))],
+          overrides: [
+            dmListProvider.overrideWith(() => _Dms(dms)),
+            remindersProvider.overrideWith(_NoReminders.new),
+          ],
           child: buildTestMaterialApp(_opener()),
         ),
       );
@@ -52,6 +83,56 @@ void main() {
       expect(find.text("You're all caught up"), findsOneWidget);
       expect(find.text('You have no unread messages.'), findsOneWidget);
       expect(find.text('Ada'), findsNothing);
+    });
+
+    group('reminders', () {
+      Future<void> openWithReminders(
+        WidgetTester tester, {
+        void Function(MessageReminder)? onOpen,
+      }) async {
+        await tester.pumpWidget(
+          ProviderScope(
+            overrides: [
+              dmListProvider.overrideWith(() => _Dms([_dm('c-ada', 'Ada')])),
+              remindersProvider.overrideWith(() => _WithReminders([_reminder])),
+              reminderOpenerProvider.overrideWithValue(onOpen ?? (_) {}),
+            ],
+            child: buildTestMaterialApp(_opener()),
+          ),
+        );
+        await tester.tap(find.text('Open'));
+        await tester.pumpAndSettle();
+      }
+
+      testWidgets('are listed, and replace the empty state', (tester) async {
+        await openWithReminders(tester);
+
+        expect(find.text('Reminders'), findsOneWidget);
+        expect(find.text('general'), findsOneWidget);
+        expect(find.text('Amara: Send the course outline'), findsOneWidget);
+        expect(find.textContaining('Due '), findsOneWidget);
+        expect(find.text("You're all caught up"), findsNothing);
+      });
+
+      testWidgets('clicking one opens its chat and closes the panel', (
+        tester,
+      ) async {
+        MessageReminder? opened;
+        await openWithReminders(tester, onOpen: (r) => opened = r);
+
+        await tester.tap(find.text('general'));
+        await tester.pumpAndSettle();
+
+        expect(opened?.id, 'r1');
+        expect(find.text('Notifications'), findsNothing);
+      });
+
+      testWidgets('offer snooze and done on each one', (tester) async {
+        await openWithReminders(tester);
+
+        expect(find.byKey(const ValueKey('snooze-r1')), findsOneWidget);
+        expect(find.byKey(const ValueKey('done-r1')), findsOneWidget);
+      });
     });
 
     testWidgets('lists only the unread DMs', (tester) async {
@@ -108,6 +189,7 @@ void main() {
         overrides: [
           currentOrgIdProvider.overrideWithValue('org-test'),
           dmListProvider.overrideWith(() => _Dms([ada])),
+          remindersProvider.overrideWith(_NoReminders.new),
         ],
       );
       addTearDown(container.dispose);
@@ -145,7 +227,10 @@ void main() {
     testWidgets('sidebar bell opens the panel', (tester) async {
       await tester.pumpWidget(
         ProviderScope(
-          overrides: [dmListProvider.overrideWith(() => _Dms(const []))],
+          overrides: [
+            dmListProvider.overrideWith(() => _Dms(const [])),
+            remindersProvider.overrideWith(_NoReminders.new),
+          ],
           child: buildTestMaterialApp(
             const Scaffold(
               body: Row(
