@@ -88,6 +88,7 @@ Future<int> _hoverPeopleAndCountLoads(
       overrides: [
         userProfileNotifierProvider.overrideWith(() => notifier),
         authNotifierProvider.overrideWith(_FakeAuthNotifier.new),
+        dueReminderCountProvider.overrideWithValue(0),
       ],
       child: buildTestMaterialApp(
         const Scaffold(

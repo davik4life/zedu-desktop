@@ -1,16 +1,19 @@
 import 'package:zedu/core/core.dart';
+import 'package:zedu/features/features.dart';
 
 /// Panel opened from the notifications bell in the sidebar rail.
 ///
-/// The desktop app has no notifications feed yet, so this shows an empty
-/// state. Real incoming-message notifications are still delivered by
+/// Lists the user's reminders ("Remind me" on a message). The desktop app has
+/// no notifications feed yet, so the empty state shows whenever there are none.
+/// Real incoming-message notifications are still delivered by
 /// `NotificationService`.
-class NotificationsDialog extends StatelessWidget {
+class NotificationsDialog extends ConsumerWidget {
   const NotificationsDialog({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final colors = context.colors;
+    final hasReminders = ref.watch(remindersProvider).isNotEmpty;
 
     return Dialog(
       insetPadding: const EdgeInsets.only(bottom: 80, left: 74),
@@ -54,37 +57,54 @@ class NotificationsDialog extends StatelessWidget {
               ),
             ),
             Divider(height: 1, color: colors.divider),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 40),
-              child: Column(
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 420),
+              child: ListView(
+                shrinkWrap: true,
+                padding: const EdgeInsets.symmetric(vertical: 6),
                 children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: colors.primaryBg,
-                      shape: BoxShape.circle,
+                  const RemindersSection(),
+                  if (!hasReminders)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 24,
+                        vertical: 40,
+                      ),
+                      child: Column(
+                        children: [
+                          Container(
+                            width: 48,
+                            height: 48,
+                            decoration: BoxDecoration(
+                              color: colors.primaryBg,
+                              shape: BoxShape.circle,
+                            ),
+                            child: Icon(
+                              Icons.notifications_none_outlined,
+                              color: colors.primary,
+                            ),
+                          ),
+                          const SizedBox(height: 16),
+                          Text(
+                            "You're all caught up",
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: colors.textPrimary,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            "There's nothing to show here yet.",
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: colors.textSecondary,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
-                    child: Icon(
-                      Icons.notifications_none_outlined,
-                      color: colors.primary,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    "You're all caught up",
-                    style: TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.w600,
-                      color: colors.textPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    "There's nothing to show here yet.",
-                    textAlign: TextAlign.center,
-                    style: TextStyle(fontSize: 13, color: colors.textSecondary),
-                  ),
                 ],
               ),
             ),

@@ -35,6 +35,13 @@ class FakeSignedInAuthNotifier extends AuthNotifier {
   );
 }
 
+/// No reminders, so these tests do not need the storage and workspace the
+/// real list reads.
+class _NoReminders extends RemindersNotifier {
+  @override
+  List<MessageReminder> build() => const [];
+}
+
 void main() {
   testWidgets('DmChatArea header has no test notification button', (
     tester,
@@ -179,6 +186,7 @@ void main() {
           overrides: [
             dmRepositoryProvider.overrideWithValue(repository),
             authNotifierProvider.overrideWith(FakeSignedInAuthNotifier.new),
+            remindersProvider.overrideWith(_NoReminders.new),
             dmDraftStoreProvider.overrideWith(
               (ref) => DmDraftStore(storage, userId: 'user-1', orgId: 'org-1'),
             ),
@@ -221,8 +229,36 @@ void main() {
       await tester.longPress(find.text('my message', findRichText: true));
       await tester.pumpAndSettle();
 
+      expect(find.text('Remind me'), findsOneWidget);
       expect(find.text('Edit message'), findsOneWidget);
       expect(find.text('Delete message'), findsOneWidget);
+    });
+
+    testWidgets('an incoming message offers Remind me but not Edit or Delete', (
+      tester,
+    ) async {
+      await pumpChat(tester, [message('m2', 'their message')]);
+
+      await tester.longPress(find.text('their message', findRichText: true));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Remind me'), findsOneWidget);
+      expect(find.text('Edit message'), findsNothing);
+      expect(find.text('Delete message'), findsNothing);
+    });
+
+    testWidgets('Remind me from the menu opens the time picker', (
+      tester,
+    ) async {
+      await pumpChat(tester, [message('m2', 'their message')]);
+
+      await tester.longPress(find.text('their message', findRichText: true));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Remind me'));
+      await tester.pumpAndSettle();
+
+      expect(find.text('Remind me about this message'), findsOneWidget);
+      expect(find.text('In 1 hour'), findsOneWidget);
     });
 
     testWidgets('Edit message from the menu puts the message in the composer', (

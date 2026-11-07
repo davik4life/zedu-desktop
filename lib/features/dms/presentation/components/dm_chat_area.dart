@@ -675,6 +675,26 @@ class _MessageBubble extends ConsumerWidget {
     required this.onEdit,
   });
 
+  /// Asks when to be reminded about this message, then saves the reminder.
+  void _remind(
+    BuildContext context,
+    WidgetRef ref,
+    String messageId,
+    String senderName,
+    String text,
+  ) {
+    remindAboutMessage(
+      context,
+      ref,
+      channelId: channelId,
+      channelName: conversation.displayName,
+      participantId: conversation.participantId,
+      senderName: senderName,
+      messageText: text,
+      messageId: messageId,
+    );
+  }
+
   TextSpan _parseRichText(String text, TextStyle defaultStyle) {
     if (text.isEmpty) return TextSpan(style: defaultStyle, text: '');
 
@@ -931,10 +951,15 @@ class _MessageBubble extends ConsumerWidget {
                   ),
                 ),
                 if (content.isNotEmpty)
-                  _OwnMessageMenu(
-                    enabled: isMe && status == null,
-                    onEdit: () => onEdit(messageId, rawContent),
-                    onDelete: () => _confirmDelete(context, ref, messageId),
+                  _MessageMenu(
+                    enabled: messageId.isNotEmpty && status == null,
+                    isOwnMessage: isMe,
+                    onRemind: () =>
+                        _remind(context, ref, messageId, senderName, content),
+                    onEdit: isMe ? () => onEdit(messageId, rawContent) : null,
+                    onDelete: isMe
+                        ? () => _confirmDelete(context, ref, messageId)
+                        : null,
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -961,12 +986,21 @@ class _MessageBubble extends ConsumerWidget {
                     child: content.isNotEmpty
                         ? _AttachmentBubbleList(media: media, isMe: isMe)
                         // No text to hang the menu on, so it goes on the
-                        // attachments (Delete only: there is nothing to edit).
-                        : _OwnMessageMenu(
-                            enabled: isMe && status == null,
+                        // attachments (no Edit: there is nothing to edit).
+                        : _MessageMenu(
+                            enabled: messageId.isNotEmpty && status == null,
+                            isOwnMessage: isMe,
+                            onRemind: () => _remind(
+                              context,
+                              ref,
+                              messageId,
+                              senderName,
+                              'Sent an attachment',
+                            ),
                             onEdit: null,
-                            onDelete: () =>
-                                _confirmDelete(context, ref, messageId),
+                            onDelete: isMe
+                                ? () => _confirmDelete(context, ref, messageId)
+                                : null,
                             child: _AttachmentBubbleList(
                               media: media,
                               isMe: isMe,
@@ -1149,32 +1183,79 @@ class _AttachmentBubbleList extends StatelessWidget {
 }
 
 /// Shows a "more" button on hover, and a right-click or long-press menu, for
-/// your own messages, with Edit and Delete. The long press is for touch input,
-/// where there is no hover or right click.
-class _OwnMessageMenu extends StatefulWidget {
-  const _OwnMessageMenu({
+/// a sent message: Remind me on every message, and Edit and Delete on your own.
+/// The long press is for touch input, where there is no hover or right click.
+///
+/// Your own messages keep a fixed gutter for the button so the bubble never
+/// moves; incoming messages only grow one while hovered so the conversation
+/// keeps its alignment when the pointer is elsewhere.
+class _MessageMenu extends StatefulWidget {
+  const _MessageMenu({
     required this.enabled,
+    required this.isOwnMessage,
+    required this.onRemind,
     required this.onEdit,
     required this.onDelete,
     required this.child,
   });
 
   final bool enabled;
+  final bool isOwnMessage;
+  final VoidCallback onRemind;
+
+  /// Null on other people's messages, which can't be edited or deleted.
   final VoidCallback? onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onDelete;
   final Widget child;
 
   @override
-  State<_OwnMessageMenu> createState() => _OwnMessageMenuState();
+  State<_MessageMenu> createState() => _MessageMenuState();
 }
 
-class _OwnMessageMenuState extends State<_OwnMessageMenu> {
+class _MessageMenuState extends State<_MessageMenu> {
   final _menuKey = GlobalKey<PopupMenuButtonState<String>>();
   bool _hovered = false;
 
   @override
   Widget build(BuildContext context) {
     if (!widget.enabled) return widget.child;
+
+    final button = PopupMenuButton<String>(
+      key: _menuKey,
+      tooltip: 'Message actions',
+      icon: const Icon(Icons.more_horiz, size: 18),
+      onSelected: (value) => switch (value) {
+        'remind' => widget.onRemind(),
+        'edit' => widget.onEdit?.call(),
+        _ => widget.onDelete?.call(),
+      },
+      itemBuilder: (context) => [
+        const PopupMenuItem(
+          value: 'remind',
+          child: MenuItemRow(
+            icon: Icons.alarm_add_outlined,
+            label: 'Remind me',
+          ),
+        ),
+        if (widget.onEdit != null)
+          const PopupMenuItem(
+            value: 'edit',
+            child: MenuItemRow(
+              icon: Icons.edit_outlined,
+              label: 'Edit message',
+            ),
+          ),
+        if (widget.onDelete != null)
+          PopupMenuItem(
+            value: 'delete',
+            child: MenuItemRow(
+              icon: Icons.delete_outline,
+              label: 'Delete message',
+              color: context.colors.error,
+            ),
+          ),
+      ],
+    );
 
     return MouseRegion(
       onEnter: (_) => setState(() => _hovered = true),
@@ -1184,30 +1265,17 @@ class _OwnMessageMenuState extends State<_OwnMessageMenu> {
         onLongPress: () => _menuKey.currentState?.showButtonMenu(),
         child: Row(
           mainAxisSize: MainAxisSize.min,
-          children: [
-            Opacity(
-              opacity: _hovered ? 1 : 0,
-              child: PopupMenuButton<String>(
-                key: _menuKey,
-                tooltip: 'Message actions',
-                icon: const Icon(Icons.more_horiz, size: 18),
-                onSelected: (value) =>
-                    value == 'edit' ? widget.onEdit?.call() : widget.onDelete(),
-                itemBuilder: (_) => [
-                  if (widget.onEdit != null)
-                    const PopupMenuItem(
-                      value: 'edit',
-                      child: Text('Edit message'),
-                    ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Text('Delete message'),
-                  ),
+          children: widget.isOwnMessage
+              ? [
+                  Opacity(opacity: _hovered ? 1 : 0, child: button),
+                  Flexible(child: widget.child),
+                ]
+              : [
+                  Flexible(child: widget.child),
+                  // Kept in the tree at rest so the right-click and long-press
+                  // handlers can still open its menu; Offstage takes no room.
+                  Offstage(offstage: !_hovered, child: button),
                 ],
-              ),
-            ),
-            Flexible(child: widget.child),
-          ],
         ),
       ),
     );

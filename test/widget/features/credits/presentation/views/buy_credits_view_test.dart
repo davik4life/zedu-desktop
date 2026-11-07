@@ -66,6 +66,7 @@ void main() {
           authNotifierProvider.overrideWith(FakeAuthNotifier.new),
           userProfileNotifierProvider.overrideWith(FakeUserProfileNotifier.new),
           creditsRepositoryProvider.overrideWithValue(repository),
+          dueReminderCountProvider.overrideWithValue(0),
         ],
       );
       addTearDown(container.dispose);
